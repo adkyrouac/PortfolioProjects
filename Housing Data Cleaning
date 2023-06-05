@@ -1,0 +1,154 @@
+--Cleaning Housing Data
+
+Select *
+From HousingCleaning
+
+
+
+-- Sale Date Formmating
+Select SaleDateconverted, Convert(Date,saledate)
+From HousingCleaning
+
+Update HousingCleaning
+SET SaleDate = Convert(Date,saledate)
+
+ALTER TABLE HousingCleaning
+Add SaleDateConverted Date;
+
+Update HousingCleaning
+SET SaleDateConverted = Convert(Date,saledate)
+
+
+
+--Cleaning Property Address Data
+
+Select *
+From HousingCleaning
+Order by parcelID
+
+Select a.parcelid, a.propertyaddress, b.parcelid, b.propertyaddress
+From HousingCleaning a
+JOIN HousingCleaning b
+	on a.parcelid = b.parcelid
+	AND a.[UniqueID] <> b.[UniqueID]
+
+Update a
+SET propertyaddress = ISNULL(a.propertyaddress, b.propertyaddress)
+From HousingCleaning a
+JOIN HousingCleaning b
+	on a.parcelid = b.parcelid
+	AND a.[UniqueID] <> b.[UniqueID]
+
+
+
+--Seperating Addresss into Seperate Columns (Address, City, State)
+
+Select PropertyAddress
+From HousingCleaning
+
+SELECT
+SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1 ) as address
+, SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) + 1 , LEN(PropertyAddress)) as city
+
+From HousingCleaning
+
+
+ALTER TABLE HousingCleaning
+Add PropertySplitAddress Nvarchar(255);
+
+Update HousingCleaning
+SET PropertySplitAddress = SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1 )
+
+
+ALTER TABLE HousingCleaning
+Add PropertySplitCity Nvarchar(255);
+
+Update HousingCleaning
+SET PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) + 1 , LEN(PropertyAddress))
+
+
+
+Select OwnerAddress
+From HousingCleaning
+
+Select
+PARSENAME(REPLACE(OwnerAddress, ',', '.') ,3) as Address
+,PARSENAME(REPLACE(OwnerAddress, ',', '.') ,2) as City
+,PARSENAME(REPLACE(OwnerAddress, ',', '.') ,1) as State
+From HousingCleaning
+
+
+
+ALTER TABLE HousingCleaning
+Add OwnerSplitAddress Nvarchar(255);
+
+Update HousingCleaning
+SET OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.') ,3)
+
+
+ALTER TABLE HousingCleaning
+Add OwnerSplitCity Nvarchar(255);
+
+Update HousingCleaning
+SET OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.') ,2)
+
+ALTER TABLE HousingCleaning
+Add OwnerSplitState Nvarchar(255);
+
+Update HousingCleaning
+SET OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.') ,1)
+
+
+--SoldAsVacant Modification
+
+Select Distinct(SoldAsVacant), count(SoldAsVacant)
+From HousingCleaning
+Group by SoldAsVacant
+order by 2
+
+
+Select SoldAsVacant
+, Case When SoldAsVacant = 'Y' Then 'Yes'
+	   When SoldAsVacant = 'N' Then 'No'
+	   Else SoldAsVacant
+	   END
+From HousingCleaning
+
+
+Update HousingCleaning
+SET SoldAsVacant = Case When SoldAsVacant = 'Y' Then 'Yes'
+	   When SoldAsVacant = 'N' Then 'No'
+	   Else SoldAsVacant
+	   END
+
+
+-- Removing Duplicate Data
+
+WITH RowNumCTE AS(
+Select *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+				 SalePrice,
+				 SaleDate,
+				 LegalReference
+				 Order by
+					UniqueID
+					) row_num
+From HousingCleaning
+)
+DELETE
+From RowNumCTE
+Where row_num > 1
+
+
+--Deleting Unneccesary Columns
+
+Select *
+From HousingCleaning
+
+Alter table HousingCleaning
+Drop Column OwnerAddress, TaxDistrict, PropertyAddress
+
+Alter table HousingCleaning
+Drop Column SaleDate
